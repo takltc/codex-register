@@ -63,7 +63,7 @@ def test_get_verification_code_ignores_messages_received_before_otp_sent_at():
     assert code == "222222"
 
 
-def test_get_verification_code_requires_received_at_when_otp_sent_at_is_present():
+def test_get_verification_code_uses_date_field_when_received_at_is_missing():
     service = TempmailService({"base_url": "https://api.tempmail.test"})
     service._email_cache["tester@example.com"] = {"token": "token-1"}
     service.http_client = FakeHTTPClient([
@@ -95,4 +95,48 @@ def test_get_verification_code_requires_received_at_when_otp_sent_at_is_present(
         otp_sent_at=_to_timestamp("2026-03-23T10:00:05Z"),
     )
 
-    assert code == "444444"
+    assert code == "333333"
+
+
+def test_get_verification_code_accepts_tempmail_date_field_as_timestamp():
+    service = TempmailService({"base_url": "https://api.tempmail.test"})
+    service._email_cache["tester@example.com"] = {"token": "token-1"}
+    service.http_client = FakeHTTPClient([
+        FakeResponse(
+            {
+                "emails": [
+                    {
+                        "id": "old-mail",
+                        "date": "2026-03-23T10:00:02Z",
+                        "from": "noreply@openai.com",
+                        "subject": "Old code",
+                        "body": "111111",
+                    },
+                    {
+                        "id": "new-mail",
+                        "date": "2026-03-23T10:00:08Z",
+                        "from": "noreply@openai.com",
+                        "subject": "New code",
+                        "body": "222222",
+                    },
+                ]
+            }
+        )
+    ])
+
+    code = service.get_verification_code(
+        email="tester@example.com",
+        timeout=1,
+        otp_sent_at=_to_timestamp("2026-03-23T10:00:05Z"),
+    )
+
+    assert code == "222222"
+
+
+def test_parse_message_time_normalizes_timezone_offset():
+    service = TempmailService({"base_url": "https://api.tempmail.test"})
+
+    utc_timestamp = service._parse_message_time("2026-03-23T10:00:07Z")
+    offset_timestamp = service._parse_message_time("2026-03-23T18:00:07+08:00")
+
+    assert utc_timestamp == offset_timestamp

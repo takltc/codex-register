@@ -89,7 +89,11 @@ class TempmailService(BaseEmailService):
 
     def _get_received_timestamp(self, message: Dict[str, Any]) -> Optional[float]:
         """返回 Tempmail 邮件的接收时间戳。"""
-        return self._parse_message_time(message.get("received_at"))
+        for field_name in ("received_at", "date", "created_at", "createdAt", "timestamp"):
+            timestamp = self._parse_message_time(message.get(field_name))
+            if timestamp is not None:
+                return timestamp
+        return None
 
     def _save_token_to_db(self, email: str, token: str) -> None:
         """将邮箱 token 持久化到 Setting 表，key=tempmail_token:{email}"""
